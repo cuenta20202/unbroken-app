@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "updatedAt": "2026-11-22T00:00:00.000Z",
+  "usuarios": [
+    {
+      "id": "admin001",
+      "nombre": "Admin",
+      "username": "admin",
+      "password": "h1g7qrk",
+      "rol": "admin",
+      "activo": true,
+      "creadoEn": "2026-11-22T00:00:00.000Z"
+    }
+  ],
+  "inventario": [],
+  "ventas": [],
+  "costos": [],
+  "config": {
+    "tallas": ["XS", "S", "M", "L", "XL", "XXL"],
+    "categoriasCosto": [
+      "Envío",
+      "Empaque",
+      "Publicidad",
+      "Arriendo",
+      "Nómina",
+      "Materiales",
+      "Otro"
+    ]
+  }
+}

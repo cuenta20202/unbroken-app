@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#0D1117" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Unbroken" />
+  <title>Unbroken. — Gestión de Tienda</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+  <link rel="stylesheet" href="app.css" />
+</head>
+<body>
+
+  <!-- ══════════════════════════════════════════
+       PANTALLA DE LOGIN
+  ══════════════════════════════════════════ -->
+  <div id="screen-login" class="screen active">
+    <div class="login-wrap">
+      <div class="login-logo">
+        <span class="logo-text">UNBROKEN</span>
+        <span class="logo-dot">.</span>
+      </div>
+      <p class="login-sub">Sistema de gestión interno</p>
+
+      <div class="form-group">
+        <label>Usuario</label>
+        <input type="text" id="login-user" placeholder="tu usuario" autocomplete="username" />
+      </div>
+      <div class="form-group">
+        <label>Contraseña</label>
+        <input type="password" id="login-pass" placeholder="••••••••" autocomplete="current-password" />
+      </div>
+      <div id="login-error" class="login-error hidden">Usuario o contraseña incorrectos</div>
+      <button class="btn btn-primary btn-full" onclick="Auth.login()">Entrar</button>
+
+      <button class="btn btn-ghost btn-full" style="font-size:12px;opacity:0.5" onclick="Auth.resetearAcceso()">¿No puedes entrar? Resetear acceso</button>
+
+      <div class="login-sync-row">
+        <label>GitHub Token</label>
+        <input type="password" id="github-token-input" placeholder="ghp_..." autocomplete="off" />
+        <button class="btn btn-ghost btn-sm" onclick="Auth.saveToken()">Guardar token</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       APP PRINCIPAL
+  ══════════════════════════════════════════ -->
+  <div id="screen-app" class="screen hidden">
+
+    <!-- TOP BAR -->
+    <header class="topbar">
+      <div class="topbar-left">
+        <span class="logo-text-sm">UNBROKEN<span class="logo-dot">.</span></span>
+      </div>
+      <div class="topbar-center">
+        <span id="topbar-title">Dashboard</span>
+      </div>
+      <div class="topbar-right">
+        <span id="sync-indicator" class="sync-dot sync-idle" title="Estado sync"></span>
+        <span id="current-user-badge" class="user-badge"></span>
+        <button class="btn btn-ghost btn-icon" onclick="Auth.logout()" title="Cerrar sesión">⏏</button>
+      </div>
+    </header>
+
+    <!-- VISTAS -->
+    <main class="main-content">
+
+      <!-- DASHBOARD -->
+      <div id="view-dashboard" class="view active">
+        <div class="dashboard-grid">
+          <div class="kpi-card kpi-blue">
+            <div class="kpi-icon">💰</div>
+            <div class="kpi-value" id="kpi-ingresos">$0</div>
+            <div class="kpi-label">Ingresos del mes</div>
+          </div>
+          <div class="kpi-card kpi-yellow">
+            <div class="kpi-icon">📦</div>
+            <div class="kpi-value" id="kpi-costos">$0</div>
+            <div class="kpi-label">Costos del mes</div>
+          </div>
+          <div class="kpi-card kpi-green">
+            <div class="kpi-icon">📈</div>
+            <div class="kpi-value" id="kpi-ganancia">$0</div>
+            <div class="kpi-label">Ganancia neta</div>
+          </div>
+          <div class="kpi-card kpi-dark">
+            <div class="kpi-icon">🧢</div>
+            <div class="kpi-value" id="kpi-prendas">0</div>
+            <div class="kpi-label">Prendas en stock</div>
+          </div>
+        </div>
+
+        <div class="section-header">
+          <h2>Últimas ventas</h2>
+          <button class="btn btn-primary btn-sm" onclick="Nav.go('ventas'); Contabilidad.abrirNuevaVenta()">+ Nueva venta</button>
+        </div>
+        <div id="dashboard-ventas-recientes" class="lista-compacta"></div>
+
+        <div class="section-header" style="margin-top:24px;">
+          <h2>Stock bajo</h2>
+          <button class="btn btn-ghost btn-sm" onclick="Nav.go('inventario')">Ver inventario →</button>
+        </div>
+        <div id="dashboard-stock-bajo" class="lista-compacta"></div>
+      </div>
+
+      <!-- INVENTARIO -->
+      <div id="view-inventario" class="view hidden">
+        <div class="view-toolbar">
+          <input type="search" id="inv-search" placeholder="Buscar prenda..." oninput="Inventario.filtrar()" />
+          <button class="btn btn-primary" onclick="Inventario.abrirModal()">+ Prenda</button>
+        </div>
+        <div class="filter-row">
+          <select id="inv-filter-cat" onchange="Inventario.filtrar()">
+            <option value="">Todas las categorías</option>
+            <option value="Camiseta">Camiseta</option>
+            <option value="Hoodie">Hoodie</option>
+            <option value="Pantalón">Pantalón</option>
+            <option value="Short">Short</option>
+            <option value="Chaqueta">Chaqueta</option>
+            <option value="Accesorio">Accesorio</option>
+            <option value="Otro">Otro</option>
+          </select>
+          <select id="inv-filter-estado" onchange="Inventario.filtrar()">
+            <option value="">Todo el stock</option>
+            <option value="disponible">Disponible</option>
+            <option value="agotado">Agotado</option>
+            <option value="bajo">Stock bajo</option>
+          </select>
+        </div>
+        <div id="inventario-lista" class="inv-grid"></div>
+      </div>
+
+      <!-- VENTAS / CONTABILIDAD -->
+      <div id="view-ventas" class="view hidden">
+        <div class="view-toolbar">
+          <select id="ventas-filter-mes" onchange="Contabilidad.filtrarMes()"></select>
+          <button class="btn btn-primary" onclick="Contabilidad.abrirNuevaVenta()">+ Venta</button>
+        </div>
+
+        <!-- Resumen del mes -->
+        <div class="resumen-mes">
+          <div class="resumen-item">
+            <span class="res-label">Ingresos</span>
+            <span class="res-valor color-blue" id="res-ingresos">$0</span>
+          </div>
+          <div class="resumen-item">
+            <span class="res-label">Costos</span>
+            <span class="res-valor color-yellow" id="res-costos">$0</span>
+          </div>
+          <div class="resumen-item">
+            <span class="res-label">Ganancia</span>
+            <span class="res-valor color-green" id="res-ganancia">$0</span>
+          </div>
+          <div class="resumen-item">
+            <span class="res-label">Margen</span>
+            <span class="res-valor" id="res-margen">0%</span>
+          </div>
+        </div>
+
+        <div id="ventas-lista" class="ventas-lista"></div>
+      </div>
+
+      <!-- COSTOS GLOBALES -->
+      <div id="view-costos" class="view hidden">
+        <div class="view-toolbar">
+          <h3 style="margin:0;color:var(--text-primary)">Costos y gastos</h3>
+          <button class="btn btn-primary" onclick="Costos.abrirModal()">+ Costo</button>
+        </div>
+        <p class="view-desc">Registra envíos, empaques, publicidad, arriendo u otros gastos de la operación.</p>
+
+        <div id="costos-categorias" class="costos-cats"></div>
+        <div id="costos-lista" class="lista-detalle"></div>
+      </div>
+
+      <!-- USUARIOS (admin only) -->
+      <div id="view-usuarios" class="view hidden">
+        <div class="view-toolbar">
+          <h3 style="margin:0;color:var(--text-primary)">Usuarios</h3>
+          <button class="btn btn-primary" id="btn-nuevo-usuario" onclick="Auth.abrirModalUsuario()">+ Usuario</button>
+        </div>
+        <div id="usuarios-lista" class="lista-detalle"></div>
+      </div>
+
+      <!-- CONFIG -->
+      <div id="view-config" class="view hidden">
+        <div class="config-section">
+          <h3>Conexión GitHub</h3>
+          <div class="form-group">
+            <label>Repositorio (usuario/repo)</label>
+            <input type="text" id="cfg-repo" placeholder="usuario/unbroken-data" />
+          </div>
+          <div class="form-group">
+            <label>Archivo de base de datos</label>
+            <input type="text" id="cfg-file" placeholder="db.json" />
+          </div>
+          <div class="form-group">
+            <label>Token de GitHub</label>
+            <input type="password" id="cfg-token" placeholder="ghp_..." />
+          </div>
+          <button class="btn btn-primary" onclick="DB.guardarConfig()">Guardar configuración</button>
+          <button class="btn btn-ghost" onclick="DB.sincronizar(true)" style="margin-left:8px">Sincronizar ahora</button>
+        </div>
+
+        <div class="config-section">
+          <h3>Categorías de costo</h3>
+          <p class="view-desc">Agrega categorías personalizadas de costos (envío, empaque, publicidad…)</p>
+          <div id="cfg-cats-lista" class="lista-compacta"></div>
+          <div class="inline-add">
+            <input type="text" id="cfg-nueva-cat" placeholder="Nueva categoría" />
+            <button class="btn btn-primary btn-sm" onclick="Costos.agregarCategoria()">Agregar</button>
+          </div>
+        </div>
+
+        <div class="config-section">
+          <h3>Tipos de talla</h3>
+          <div class="form-group">
+            <label>Tallas disponibles (separadas por coma)</label>
+            <input type="text" id="cfg-tallas" placeholder="XS,S,M,L,XL,XXL,28,30,32..." />
+          </div>
+          <button class="btn btn-primary" onclick="Inventario.guardarTallas()">Guardar tallas</button>
+        </div>
+      </div>
+
+    </main>
+
+    <!-- BOTTOM NAV -->
+    <nav class="bottom-nav">
+      <button class="nav-btn active" data-view="dashboard" onclick="Nav.go('dashboard')">
+        <span class="nav-icon">⬛</span>
+        <span class="nav-label">Inicio</span>
+      </button>
+      <button class="nav-btn" data-view="inventario" onclick="Nav.go('inventario')">
+        <span class="nav-icon">📦</span>
+        <span class="nav-label">Inventario</span>
+      </button>
+      <button class="nav-btn" data-view="ventas" onclick="Nav.go('ventas')">
+        <span class="nav-icon">💳</span>
+        <span class="nav-label">Ventas</span>
+      </button>
+      <button class="nav-btn" data-view="costos" onclick="Nav.go('costos')">
+        <span class="nav-icon">🧾</span>
+        <span class="nav-label">Costos</span>
+      </button>
+      <button class="nav-btn" data-view="config" onclick="Nav.go('config')">
+        <span class="nav-icon">⚙️</span>
+        <span class="nav-label">Config</span>
+      </button>
+      <button class="nav-btn" data-view="usuarios" onclick="Nav.go('usuarios')" id="nav-btn-usuarios" style="display:none">
+        <span class="nav-icon">👥</span>
+        <span class="nav-label">Usuarios</span>
+      </button>
+    </nav>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       MODAL GENÉRICO
+  ══════════════════════════════════════════ -->
+  <div id="modal-overlay" class="modal-overlay hidden" onclick="Modal.cerrar(event)">
+    <div class="modal-box" id="modal-box">
+      <div class="modal-header">
+        <h3 id="modal-titulo">Modal</h3>
+        <button class="btn btn-ghost btn-icon" onclick="Modal.cerrar()">✕</button>
+      </div>
+      <div id="modal-body" class="modal-body"></div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       TOAST
+  ══════════════════════════════════════════ -->
+  <div id="toast" class="toast hidden"></div>
+
+  <!-- Scripts: orden importa (data → auth → módulos → app) -->
+  <script src="data.js"></script>
+  <script src="auth.js"></script>
+  <script src="inventario.js"></script>
+  <script src="contabilidad.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
