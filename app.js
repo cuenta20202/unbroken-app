@@ -58,14 +58,13 @@ var Modal = {
 var Nav = {
   _actual: 'dashboard',
   go: function(view) {
-    /* ocultar todas */
-    ['dashboard','inventario','ventas','costos','usuarios','config'].forEach(function(v) {
-      var el = document.getElementById('view-' + v);
-      if (el) el.style.display = 'none';
+    /* ocultar todas quitando clase active */
+    document.querySelectorAll('.view').forEach(function(v) {
+      v.classList.remove('active');
     });
-    /* mostrar la pedida */
+    /* mostrar la pedida agregando clase active */
     var target = document.getElementById('view-' + view);
-    if (target) target.style.display = 'block';
+    if (target) target.classList.add('active');
 
     /* título */
     var titles = {dashboard:'Inicio',inventario:'Inventario',ventas:'Ventas',
@@ -652,12 +651,9 @@ var App = {
 };
 
 document.addEventListener('DOMContentLoaded', function() {
-  /* ocultar todas las vistas al inicio */
-  document.querySelectorAll('.view').forEach(function(v){ v.style.display='none'; });
-
   Auth.iniciar();
 
-  if ('serviceWorker' in navigator) {
+  if ('serviceWorker' in navigator && location.protocol !== 'file:') {
     navigator.serviceWorker.register('sw.js').catch(function(){});
   }
   document.addEventListener('keydown', function(e){ if(e.key==='Escape') Modal.cerrar(); });

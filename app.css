@@ -161,11 +161,11 @@ html, body {
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
   padding-bottom: calc(70px + env(safe-area-inset-bottom, 0px));
+  min-height: 0;
 }
-
 /* ══════ VIEWS ══════ */
-.view { display: none; padding: 16px; }
-.view.active { display: block; }
+.view { display: none !important; padding: 16px; }
+.view.active { display: block !important; }
 
 /* ══════ BOTTOM NAV ══════ */
 .bottom-nav {
