@@ -132,27 +132,8 @@ var Dashboard = {
       }
     }
 
-    /* stock bajo */
-    var stockEl = document.getElementById('dashboard-stock-bajo');
-    if (stockEl) {
-      var bajos = (data.inventario||[]).filter(function(i){
-        var t = Object.values(i.tallas||{}).reduce(function(a,b){return a+b;},0);
-        return t <= 3;
-      }).slice(0,5);
-      if (!bajos.length) {
-        stockEl.innerHTML = '<div style="color:var(--text-secondary);font-size:13px;padding:12px 0">Stock suficiente en todo el inventario 👍</div>';
-      } else {
-        stockEl.innerHTML = bajos.map(function(i){
-          var t = Object.values(i.tallas||{}).reduce(function(a,b){return a+b;},0);
-          var cls = t===0?'stock-agotado-badge':'stock-bajo-badge';
-          var txt = t===0?'Agotado':t+' uds';
-          return '<div class="item-row" onclick="Inventario.abrirModal(\''+i.id+'\')">' +
-            '<div class="item-row-info"><div class="item-row-title">'+i.nombre+'</div>' +
-            '<div class="item-row-sub">'+(i.categoria||'')+(i.color?' · '+i.color:'')+'</div></div>' +
-            '<span class="inv-stock-badge '+cls+'">'+txt+'</span></div>';
-        }).join('');
-      }
-    }
+    /* stock bajo — delegado a Inventario */
+    Inventario.renderStockBajo();
   }
 };
 

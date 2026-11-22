@@ -1,9 +1,8 @@
 /* ═══════════════════════════════════════════════════
    UNBROKEN. — sw.js  (Service Worker)
-   Cache-first para assets, network-first para datos
 ═══════════════════════════════════════════════════ */
 
-const CACHE = 'unbroken-v1';
+const CACHE = 'unbroken-v2';
 const ASSETS = [
   './',
   './index.html',
@@ -12,48 +11,63 @@ const ASSETS = [
   './auth.js',
   './data.js',
   './inventario.js',
-  './contabilidad.js',
   './manifest.json'
 ];
 
-// Instalar: pre-cachear assets
-self.addEventListener('install', e => {
+self.addEventListener('install', function(e) {
   e.waitUntil(
-    caches.open(CACHE).then(cache => cache.addAll(ASSETS))
+    caches.open(CACHE).then(function(cache) {
+      return Promise.all(
+        ASSETS.map(function(url) {
+          return cache.add(url).catch(function() { /* ignorar si falla */ });
+        })
+      );
+    })
   );
   self.skipWaiting();
 });
 
-// Activar: limpiar caches viejas
-self.addEventListener('activate', e => {
+self.addEventListener('activate', function(e) {
   e.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
-    )
+    caches.keys().then(function(keys) {
+      return Promise.all(
+        keys.filter(function(k) { return k !== CACHE; }).map(function(k) { return caches.delete(k); })
+      );
+    })
   );
   self.clients.claim();
 });
 
-// Fetch: cache-first para assets, network-first para GitHub API
-self.addEventListener('fetch', e => {
-  const url = e.request.url;
+self.addEventListener('fetch', function(e) {
+  var url = e.request.url;
 
-  // GitHub API → siempre red
+  /* Solo manejar http y https — ignorar chrome-extension, data:, etc. */
+  if (!url.startsWith('http://') && !url.startsWith('https://')) return;
+
+  /* GitHub API → siempre red, nunca cachear */
   if (url.includes('api.github.com')) {
-    e.respondWith(fetch(e.request).catch(() => new Response('{"error":"offline"}', { headers: { 'Content-Type': 'application/json' } })));
+    e.respondWith(
+      fetch(e.request).catch(function() {
+        return new Response('{"error":"offline"}', {
+          headers: { 'Content-Type': 'application/json' }
+        });
+      })
+    );
     return;
   }
 
-  // Assets → cache first
+  /* Assets → cache first, luego red */
   e.respondWith(
-    caches.match(e.request).then(cached => {
+    caches.match(e.request).then(function(cached) {
       if (cached) return cached;
-      return fetch(e.request).then(res => {
+      return fetch(e.request).then(function(res) {
         if (res && res.status === 200 && res.type === 'basic') {
-          const clone = res.clone();
-          caches.open(CACHE).then(c => c.put(e.request, clone));
+          var clone = res.clone();
+          caches.open(CACHE).then(function(c) { c.put(e.request, clone); });
         }
         return res;
+      }).catch(function() {
+        return new Response('', { status: 503 });
       });
     })
   );
