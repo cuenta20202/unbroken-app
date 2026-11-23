@@ -1,92 +1,83 @@
 /* ═══════════════════════════════════════════════════
-   UNBROKEN. — auth.js
-   Sistema de múltiples usuarios con roles (admin / staff)
-   Las cuentas se guardan en db.json (GitHub)
+   UNBROKEN. — auth.js  v3
+   Fix: guardarUsuario sin async/await problemático en Safari
 ═══════════════════════════════════════════════════ */
 
-const Auth = (() => {
+var Auth = (function() {
 
-  const SESSION_KEY = 'unbroken_session';
+  var SESSION_KEY = 'unbroken_session';
 
-  // ── Sesión ─────────────────────────────────────
+  /* ── sesión ── */
   function getSession() {
     try { return JSON.parse(localStorage.getItem(SESSION_KEY)); }
-    catch { return null; }
+    catch(e) { return null; }
   }
-
   function setSession(user) {
     localStorage.setItem(SESSION_KEY, JSON.stringify(user));
   }
-
   function clearSession() {
     localStorage.removeItem(SESSION_KEY);
   }
+  function estaLogueado() { return !!getSession(); }
+  function esAdmin() { var s = getSession(); return s && s.rol === 'admin'; }
+  function getUsuarioActual() { return getSession(); }
 
-  function estaLogueado() {
-    return !!getSession();
-  }
-
-  function esAdmin() {
-    const s = getSession();
-    return s && s.rol === 'admin';
-  }
-
-  function getUsuarioActual() {
-    return getSession();
-  }
-
-  // ── Guardar token desde login ──────────────────
+  /* ── guardar token ── */
   function saveToken() {
-    const t = document.getElementById('github-token-input')?.value.trim();
+    var inp = document.getElementById('github-token-input');
+    var t = inp ? inp.value.trim() : '';
     if (!t) { Toast.show('Ingresa el token primero', 'error'); return; }
     localStorage.setItem('unbroken_github_token', t);
-    // Si ya hay config, actualizar el token ahí también
-    const cfg = JSON.parse(localStorage.getItem('unbroken_config') || '{}');
+    var cfg = {};
+    try { cfg = JSON.parse(localStorage.getItem('unbroken_config') || '{}'); } catch(e){}
     cfg.token = t;
     localStorage.setItem('unbroken_config', JSON.stringify(cfg));
-    Toast.show('Token guardado', 'ok');
+    Toast.show('Token guardado ✓', 'ok');
   }
 
-  // ── LOGIN ──────────────────────────────────────
-  async function login() {
-    const username = document.getElementById('login-user')?.value.trim().toLowerCase();
-    const password = document.getElementById('login-pass')?.value;
-    const errEl = document.getElementById('login-error');
+  /* ── LOGIN ── */
+  function login() {
+    var userEl = document.getElementById('login-user');
+    var passEl = document.getElementById('login-pass');
+    var errEl  = document.getElementById('login-error');
+    var username = userEl ? userEl.value.trim().toLowerCase() : '';
+    var password = passEl ? passEl.value : '';
 
     if (!username || !password) {
-      errEl?.classList.remove('hidden');
-      errEl && (errEl.textContent = 'Completa usuario y contraseña');
+      if (errEl) { errEl.textContent = 'Completa usuario y contraseña'; errEl.classList.remove('hidden'); }
       return;
     }
 
-    // Garantizar que el admin por defecto siempre existe localmente
+    /* garantizar admin local antes de cualquier cosa */
     _garantizarAdminLocal();
 
-    // Intentar sync con GitHub (no bloqueante)
-    try { await DB.pull(); } catch (e) { /* sin conexión: usar datos locales */ }
-
-    const data = DB.getDatos();
-    const user = data.usuarios.find(u =>
-      u.username.toLowerCase() === username &&
-      u.password === _hash(password) &&
-      u.activo !== false
-    );
-
-    if (!user) {
-      errEl?.classList.remove('hidden');
-      errEl && (errEl.textContent = 'Usuario o contraseña incorrectos');
-      return;
-    }
-
-    errEl?.classList.add('hidden');
-    setSession({ id: user.id, nombre: user.nombre, username: user.username, rol: user.rol });
-    mostrarApp();
+    /* intentar sync — no bloqueante, login con datos locales si falla */
+    DB.pull()
+      .catch(function() {})
+      .then(function() {
+        var data = DB.getDatos();
+        var user = null;
+        for (var i = 0; i < data.usuarios.length; i++) {
+          var u = data.usuarios[i];
+          if (u.username.toLowerCase() === username &&
+              u.password === _hash(password) &&
+              u.activo !== false) {
+            user = u; break;
+          }
+        }
+        if (!user) {
+          if (errEl) { errEl.textContent = 'Usuario o contraseña incorrectos'; errEl.classList.remove('hidden'); }
+          return;
+        }
+        if (errEl) errEl.classList.add('hidden');
+        setSession({ id: user.id, nombre: user.nombre, username: user.username, rol: user.rol });
+        mostrarApp();
+      });
   }
 
-  // Inyecta admin por defecto en localStorage si no hay ningún usuario guardado
   function _garantizarAdminLocal() {
-    const data = DB.getDatos();
-    if (data.usuarios && data.usuarios.length > 0) return; // ya hay usuarios
+    var data = DB.getDatos();
+    if (data.usuarios && data.usuarios.length > 0) return;
     data.usuarios = [{
       id: 'admin001',
       nombre: 'Admin',
@@ -99,223 +90,237 @@ const Auth = (() => {
     DB.setDatos(data);
   }
 
-  // ── LOGOUT ──────────────────────��──────────────
+  /* ── LOGOUT ── */
   function logout() {
     DB.detenerAutoSync();
     clearSession();
     mostrarLogin();
   }
 
-  // ── INICIAR APP ────────────────────────────────
+  /* ── pantallas ── */
   function iniciar() {
-    if (estaLogueado()) {
-      mostrarApp();
-    } else {
-      mostrarLogin();
-    }
+    if (estaLogueado()) mostrarApp();
+    else mostrarLogin();
   }
 
   function mostrarLogin() {
-    document.getElementById('screen-login')?.classList.remove('hidden');
-    document.getElementById('screen-login')?.classList.add('active');
-    document.getElementById('screen-app')?.classList.add('hidden');
-    document.getElementById('screen-app')?.classList.remove('active');
+    var sl = document.getElementById('screen-login');
+    var sa = document.getElementById('screen-app');
+    if (sl) { sl.classList.remove('hidden'); sl.classList.add('active'); }
+    if (sa) { sa.classList.add('hidden');    sa.classList.remove('active'); }
   }
 
   function mostrarApp() {
-    document.getElementById('screen-login')?.classList.add('hidden');
-    document.getElementById('screen-login')?.classList.remove('active');
-    document.getElementById('screen-app')?.classList.remove('hidden');
-    document.getElementById('screen-app')?.classList.add('active');
+    var sl = document.getElementById('screen-login');
+    var sa = document.getElementById('screen-app');
+    if (sl) { sl.classList.add('hidden');    sl.classList.remove('active'); }
+    if (sa) { sa.classList.remove('hidden'); sa.classList.add('active'); }
 
-    const user = getSession();
-    const badge = document.getElementById('current-user-badge');
-    if (badge) badge.textContent = user?.nombre || user?.username || '';
+    var user  = getSession();
+    var badge = document.getElementById('current-user-badge');
+    if (badge) badge.textContent = user ? (user.nombre || user.username) : '';
 
-    // Mostrar/ocultar sección usuarios según rol
-    const btnUsuarios = document.querySelector('[data-view="usuarios"]');
-    // No hay tab de usuarios en el nav, se accede desde config si es admin
-    renderTabUsuarios();
-
+    _renderTabUsuarios();
     App.init();
   }
 
-  function renderTabUsuarios() {
-    const btn = document.getElementById('nav-btn-usuarios');
+  function _renderTabUsuarios() {
+    var btn = document.getElementById('nav-btn-usuarios');
     if (btn) btn.style.display = esAdmin() ? 'flex' : 'none';
   }
 
-  // ── GESTIÓN DE USUARIOS ────────────────────────
-  function abrirModalUsuario(userId = null) {
+  /* ═══════════════════════════════════════════
+     GESTIÓN DE USUARIOS — sin async/template literals
+     (Safari antigua tiene bugs con await dentro de onclick)
+  ═══════════════════════════════════════════ */
+  function abrirModalUsuario(userId) {
+    userId = userId || null;
     if (!esAdmin()) { Toast.show('Solo el admin puede gestionar usuarios', 'error'); return; }
 
-    const data = DB.getDatos();
-    const user = userId ? data.usuarios.find(u => u.id === userId) : null;
+    var data = DB.getDatos();
+    var user = userId ? _findUser(data, userId) : null;
 
-    Modal.abrir(user ? 'Editar usuario' : 'Nuevo usuario', `
-      <div class="form-group">
-        <label>Nombre completo</label>
-        <input type="text" id="u-nombre" value="${user?.nombre || ''}" placeholder="Nombre y apellido" />
-      </div>
-      <div class="form-group">
-        <label>Usuario</label>
-        <input type="text" id="u-username" value="${user?.username || ''}" placeholder="usuario123" ${user ? 'readonly' : ''} />
-      </div>
-      <div class="form-group">
-        <label>${user ? 'Nueva contraseña (dejar vacío = no cambiar)' : 'Contraseña'}</label>
-        <input type="password" id="u-password" placeholder="••••••••" />
-      </div>
-      <div class="form-group">
-        <label>Rol</label>
-        <select id="u-rol">
-          <option value="staff" ${user?.rol === 'staff' ? 'selected' : ''}>Staff (vendedor)</option>
-          <option value="admin" ${user?.rol === 'admin' ? 'selected' : ''}>Admin (acceso total)</option>
-        </select>
-      </div>
-      ${user ? `
-      <div class="form-group">
-        <label>Estado</label>
-        <select id="u-activo">
-          <option value="1" ${user.activo !== false ? 'selected' : ''}>Activo</option>
-          <option value="0" ${user.activo === false ? 'selected' : ''}>Inactivo</option>
-        </select>
-      </div>` : ''}
-      <div class="form-actions">
-        <button class="btn btn-ghost" onclick="Modal.cerrar()">Cancelar</button>
-        <button class="btn btn-primary" onclick="Auth.guardarUsuario('${userId || ''}')">Guardar</button>
-      </div>
-    `);
+    var estadoHtml = '';
+    if (user) {
+      estadoHtml =
+        '<div class="form-group"><label>Estado</label><select id="u-activo">' +
+          '<option value="1"' + (user.activo !== false ? ' selected' : '') + '>Activo</option>' +
+          '<option value="0"' + (user.activo === false ? ' selected' : '') + '>Inactivo</option>' +
+        '</select></div>';
+    }
+
+    Modal.abrir(user ? 'Editar usuario' : 'Nuevo usuario',
+      '<div class="form-group"><label>Nombre completo</label>' +
+        '<input type="text" id="u-nombre" value="' + (user ? _esc(user.nombre) : '') + '" placeholder="Nombre y apellido" autocomplete="off" /></div>' +
+
+      '<div class="form-group"><label>Usuario (sin espacios)</label>' +
+        '<input type="text" id="u-username" value="' + (user ? _esc(user.username) : '') + '" placeholder="usuario123" ' +
+        (user ? 'readonly style="opacity:0.6"' : '') + ' autocomplete="off" /></div>' +
+
+      '<div class="form-group"><label>' + (user ? 'Nueva contraseña (vacío = sin cambio)' : 'Contraseña') + '</label>' +
+        '<input type="password" id="u-password" placeholder="••••••••" autocomplete="new-password" /></div>' +
+
+      '<div class="form-group"><label>Rol</label><select id="u-rol">' +
+        '<option value="staff"' + (user && user.rol === 'staff' ? ' selected' : '') + '>Staff — solo ventas e inventario</option>' +
+        '<option value="admin"' + (user && user.rol === 'admin' ? ' selected' : '') + '>Admin — acceso total</option>' +
+      '</select></div>' +
+
+      estadoHtml +
+
+      '<div class="form-actions">' +
+        '<button class="btn btn-ghost" onclick="Modal.cerrar()">Cancelar</button>' +
+        '<button class="btn btn-primary" onclick="Auth.guardarUsuario(\'' + (userId || '') + '\')">Guardar</button>' +
+      '</div>'
+    );
   }
 
-  async function guardarUsuario(userId) {
-    const nombre   = document.getElementById('u-nombre')?.value.trim();
-    const username = document.getElementById('u-username')?.value.trim().toLowerCase();
-    const password = document.getElementById('u-password')?.value;
-    const rol      = document.getElementById('u-rol')?.value;
-    const activoEl = document.getElementById('u-activo');
+  function guardarUsuario(userId) {
+    var nombre   = _val('u-nombre');
+    var username = _val('u-username').toLowerCase().replace(/\s/g, '');
+    var password = _val('u-password');
+    var rol      = _val('u-rol');
+    var activoEl = document.getElementById('u-activo');
 
     if (!nombre || !username) { Toast.show('Nombre y usuario son obligatorios', 'error'); return; }
-    if (!userId && !password)  { Toast.show('La contraseña es obligatoria para usuario nuevo', 'error'); return; }
+    if (!userId && !password) { Toast.show('La contraseña es obligatoria', 'error'); return; }
 
-    const data = DB.getDatos();
+    var data = DB.getDatos();
 
     if (userId) {
-      // Editar
-      const idx = data.usuarios.findIndex(u => u.id === userId);
-      if (idx === -1) return;
+      var idx = _findIdx(data, userId);
+      if (idx === -1) { Toast.show('Usuario no encontrado', 'error'); return; }
       data.usuarios[idx].nombre = nombre;
-      data.usuarios[idx].rol = rol;
+      data.usuarios[idx].rol    = rol;
       if (activoEl) data.usuarios[idx].activo = activoEl.value === '1';
       if (password) data.usuarios[idx].password = _hash(password);
     } else {
-      // Crear
-      if (data.usuarios.some(u => u.username === username)) {
-        Toast.show('Ese usuario ya existe', 'error'); return;
+      var exists = false;
+      for (var i = 0; i < data.usuarios.length; i++) {
+        if (data.usuarios[i].username === username) { exists = true; break; }
       }
+      if (exists) { Toast.show('Ese usuario ya existe', 'error'); return; }
       data.usuarios.push({
         id: _uid(),
-        nombre,
-        username,
+        nombre: nombre,
+        username: username,
         password: _hash(password),
-        rol,
+        rol: rol,
         activo: true,
         creadoEn: new Date().toISOString()
       });
     }
 
-    await DB.guardarYPush(data);
+    /* guardar local inmediatamente, push en background */
+    DB.setDatos(data);
     Modal.cerrar();
     renderUsuarios();
-    Toast.show(userId ? 'Usuario actualizado' : 'Usuario creado', 'ok');
+    Toast.show(userId ? 'Usuario actualizado ✓' : 'Usuario creado ✓', 'ok');
+
+    /* push asíncrono sin bloquear UI */
+    DB.push().catch(function() {
+      Toast.show('Guardado local. Fallo sync.', 'warn');
+    });
   }
 
   function renderUsuarios() {
-    const lista = document.getElementById('usuarios-lista');
+    var lista = document.getElementById('usuarios-lista');
     if (!lista) return;
-    const data = DB.getDatos();
-
-    if (data.usuarios.length === 0) {
-      lista.innerHTML = `<div class="empty-state"><div class="empty-state-icon">👤</div><div class="empty-state-title">Sin usuarios</div><div class="empty-state-sub">Agrega el primer usuario</div></div>`;
+    var data = DB.getDatos();
+    if (!data.usuarios || !data.usuarios.length) {
+      lista.innerHTML =
+        '<div class="empty-state"><div class="empty-state-icon">👤</div>' +
+        '<div class="empty-state-title">Sin usuarios</div>' +
+        '<div class="empty-state-sub">Agrega el primer usuario</div></div>';
       return;
     }
-
-    lista.innerHTML = data.usuarios.map(u => `
-      <div class="item-row" onclick="Auth.abrirModalUsuario('${u.id}')">
-        <div class="item-row-info">
-          <div class="item-row-title">${u.nombre}</div>
-          <div class="item-row-sub">@${u.username} ${u.activo === false ? '· <span style="color:var(--red)">Inactivo</span>' : ''}</div>
-        </div>
-        <span class="user-row-rol rol-${u.rol}">${u.rol === 'admin' ? 'Admin' : 'Staff'}</span>
-      </div>
-    `).join('');
+    lista.innerHTML = data.usuarios.map(function(u) {
+      return '<div class="item-row" onclick="Auth.abrirModalUsuario(\'' + u.id + '\')">' +
+        '<div class="item-row-info">' +
+          '<div class="item-row-title">' + _esc(u.nombre) + '</div>' +
+          '<div class="item-row-sub">@' + u.username +
+            (u.activo === false ? ' · <span style="color:var(--red)">Inactivo</span>' : '') +
+          '</div>' +
+        '</div>' +
+        '<span class="user-row-rol rol-' + u.rol + '">' + (u.rol === 'admin' ? 'Admin' : 'Staff') + '</span>' +
+      '</div>';
+    }).join('');
   }
 
-  // ── Resetear acceso de emergencia ─────────────
-  function resetearAcceso() {
-    if (!confirm('Esto borrará los datos locales e inyectará el admin por defecto.\n\nUsuario: admin\nContraseña: unbroken2024\n\n¿Continuar?')) return;
-    // Borrar solo la parte de usuarios del data, conservar inventario/ventas/costos
-    const data = DB.getDatos();
+  /* ── admin inicial ── */
+  function crearAdminInicial() {
+    var data = DB.getDatos();
+    if (data.usuarios && data.usuarios.length > 0) return;
     data.usuarios = [{
-      id: 'admin001',
-      nombre: 'Admin',
-      username: 'admin',
-      password: _hash('unbroken2024'),
-      rol: 'admin',
-      activo: true,
-      creadoEn: new Date().toISOString()
+      id: 'admin001', nombre: 'Admin', username: 'admin',
+      password: _hash('unbroken2024'), rol: 'admin',
+      activo: true, creadoEn: new Date().toISOString()
     }];
     DB.setDatos(data);
-    localStorage.removeItem('unbroken_session');
-    // Limpiar campos
-    document.getElementById('login-user').value = 'admin';
-    document.getElementById('login-pass').value = '';
-    document.getElementById('login-error').classList.add('hidden');
+    DB.push().catch(function(){});
+  }
+
+  /* ── resetear acceso ── */
+  function resetearAcceso() {
+    if (!confirm('Se restablece el admin por defecto.\n\nUsuario: admin\nContraseña: unbroken2024\n\n¿Continuar?')) return;
+    var data = DB.getDatos();
+    data.usuarios = [{
+      id: 'admin001', nombre: 'Admin', username: 'admin',
+      password: _hash('unbroken2024'), rol: 'admin',
+      activo: true, creadoEn: new Date().toISOString()
+    }];
+    DB.setDatos(data);
+    clearSession();
+    var userEl = document.getElementById('login-user');
+    var passEl = document.getElementById('login-pass');
+    var errEl  = document.getElementById('login-error');
+    if (userEl) userEl.value = 'admin';
+    if (passEl) passEl.value = '';
+    if (errEl)  errEl.classList.add('hidden');
     alert('Listo. Entra con: admin / unbroken2024');
   }
-  async function crearAdminInicial() {
-    const data = DB.getDatos();
-    if (data.usuarios && data.usuarios.length > 0) return;
 
-    data.usuarios = data.usuarios || [];
-    data.usuarios.push({
-      id: 'admin001',
-      nombre: 'Admin',
-      username: 'admin',
-      password: _hash('unbroken2024'),
-      rol: 'admin',
-      activo: true,
-      creadoEn: new Date().toISOString()
-    });
-    // Guardar local primero, push en segundo plano
-    DB.setDatos(data);
-    DB.push().catch(() => {}); // no bloquear si falla
-  }
-
-  // ── Utilidades ─────────────────────────────────
+  /* ── utils ── */
   function _hash(str) {
-    // Hash simple para contraseñas (producción debería usar bcrypt en servidor)
-    let h = 5381;
-    for (let i = 0; i < str.length; i++) h = ((h << 5) + h) ^ str.charCodeAt(i);
+    var h = 5381;
+    for (var i = 0; i < str.length; i++) h = ((h << 5) + h) ^ str.charCodeAt(i);
     return 'h' + Math.abs(h).toString(36);
   }
-
   function _uid() {
     return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
   }
+  function _val(id) {
+    var el = document.getElementById(id);
+    return el ? el.value.trim() : '';
+  }
+  function _esc(s) {
+    return (s || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+  function _findUser(data, id) {
+    for (var i = 0; i < data.usuarios.length; i++) {
+      if (data.usuarios[i].id === id) return data.usuarios[i];
+    }
+    return null;
+  }
+  function _findIdx(data, id) {
+    for (var i = 0; i < data.usuarios.length; i++) {
+      if (data.usuarios[i].id === id) return i;
+    }
+    return -1;
+  }
 
   return {
-    iniciar,
-    login,
-    logout,
-    estaLogueado,
-    esAdmin,
-    getUsuarioActual,
-    saveToken,
-    abrirModalUsuario,
-    guardarUsuario,
-    renderUsuarios,
-    crearAdminInicial,
-    resetearAcceso
+    iniciar: iniciar,
+    login: login,
+    logout: logout,
+    estaLogueado: estaLogueado,
+    esAdmin: esAdmin,
+    getUsuarioActual: getUsuarioActual,
+    saveToken: saveToken,
+    abrirModalUsuario: abrirModalUsuario,
+    guardarUsuario: guardarUsuario,
+    renderUsuarios: renderUsuarios,
+    crearAdminInicial: crearAdminInicial,
+    resetearAcceso: resetearAcceso
   };
 
-})();
+}());

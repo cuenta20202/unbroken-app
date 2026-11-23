@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════════
-   UNBROKEN. — inventario.js  v3
-   Foto por prenda · Colores visuales · Stock por talla
+   UNBROKEN. — inventario.js  v4
+   Foto · Colores · Stock · USD/COP con TRM
 ═══════════════════════════════════════════════════ */
 
 var Inventario = (function() {
@@ -98,6 +98,9 @@ var Inventario = (function() {
       ? '<span class="color-dot" style="background:' + (hex || '#888') + '" title="' + item.color + '"></span>'
       : '';
 
+    /* costo: mostrar en COP siempre */
+    var costoCOP = item.costoCOP || item.costo || 0;
+
     return (
       '<div class="inv-card" onclick="Inventario.abrirModal(\'' + item.id + '\')">' +
         imgH +
@@ -109,7 +112,7 @@ var Inventario = (function() {
           (item.color ? '<div class="inv-color-row">' + colorDot + '<span class="inv-color-name">' + item.color + '</span></div>' : '') +
           '<div class="inv-tallas">' + tallasH + '</div>' +
           '<div class="inv-precios">' +
-            '<span class="inv-costo">' + _fmt(item.costo) + ' costo</span>' +
+            '<span class="inv-costo">' + _fmt(costoCOP) + ' costo</span>' +
             '<span class="inv-precio">' + _fmt(item.precio) + '</span>' +
           '</div>' +
           '<span class="inv-stock-badge ' + badgeCls + '">' + badgeTxt + '</span>' +
@@ -131,6 +134,12 @@ var Inventario = (function() {
     var tallas = (data.config && data.config.tallas) || ['XS','S','M','L','XL','XXL'];
 
     _colorActual = item ? (item.color || null) : null;
+
+    /* ── valores de moneda/TRM ── */
+    var moneda   = item && item.moneda   ? item.moneda   : 'COP';
+    var trm      = item && item.trm      ? item.trm      : 4000;
+    var costoUSD = item && item.costoUSD ? item.costoUSD : 0;
+    var costoCOP = item && item.costoCOP ? item.costoCOP : (item && item.costo ? item.costo : 0);
 
     /* ── tallas ── */
     var tallasH = tallas.map(function(t){
@@ -194,10 +203,25 @@ var Inventario = (function() {
           '<input type="number" id="inv-precio" value="' + (item ? item.precio || '' : '') + '" placeholder="0" min="0" /></div>' +
       '</div>' +
 
-      /* — COSTO — */
+      /* — MONEDA + TRM — */
       '<div class="form-group">' +
-        '<label>Costo unitario ($)</label>' +
-        '<input type="number" id="inv-costo" value="' + (item ? item.costo || '' : '') + '" placeholder="0" min="0" />' +
+        '<label>Costo unitario</label>' +
+        '<div class="form-row" style="margin-bottom:8px">' +
+          '<div class="form-group"><label style="font-size:12px;font-weight:600;margin-bottom:4px">Moneda</label>' +
+            '<select id="inv-moneda" onchange="Inventario._onMonedaChange()">' +
+              '<option value="COP"' + (moneda === 'COP' ? ' selected' : '') + '>Pesos COP</option>' +
+              '<option value="USD"' + (moneda === 'USD' ? ' selected' : '') + '>Dólares USD</option>' +
+            '</select></div>' +
+          '<div class="form-group"><label style="font-size:12px;font-weight:600;margin-bottom:4px">TRM (USD → COP)</label>' +
+            '<input type="number" id="inv-trm" value="' + trm + '" placeholder="4000" min="0" step="1" onchange="Inventario._onTRMChange()" /></div>' +
+        '</div>' +
+        '<div class="form-row">' +
+          '<div class="form-group"><label style="font-size:12px;font-weight:600;margin-bottom:4px">Costo USD</label>' +
+            '<input type="number" id="inv-costo-usd" value="' + costoUSD + '" placeholder="0" min="0" step="0.01" onchange="Inventario._onCostoChange()" /></div>' +
+          '<div class="form-group"><label style="font-size:12px;font-weight:600;margin-bottom:4px">Costo COP</label>' +
+            '<input type="number" id="inv-costo-cop" value="' + costoCOP + '" placeholder="0" min="0" step="1" onchange="Inventario._onCostoChange()" /></div>' +
+        '</div>' +
+        '<div style="font-size:11px;color:var(--text-muted);margin-top:4px">💡 Elige la moneda de compra y el sistema convierte automáticamente</div>' +
       '</div>' +
 
       /* — COLORES — */
@@ -235,9 +259,56 @@ var Inventario = (function() {
         '<button class="btn btn-primary" onclick="Inventario.guardar(\'' + (itemId || '') + '\')">Guardar</button>' +
       '</div>'
     );
+
+    /* establecer moneda inicial (habilita/deshabilita campos) */
+    _onMonedaChange();
   }
 
-  /* ── seleccionar color desde swatch ── */
+  /* ══════════════════════════════════════════
+     CONVERSIÓN USD/COP
+  ══════════════════════════════════════════ */
+  function _onMonedaChange() {
+    var moneda   = (document.getElementById('inv-moneda') || {}).value || 'COP';
+    var trm      = parseFloat((document.getElementById('inv-trm') || {}).value || '4000') || 4000;
+    var costoUSD = parseFloat((document.getElementById('inv-costo-usd') || {}).value || '0') || 0;
+    var costoCOP = parseFloat((document.getElementById('inv-costo-cop') || {}).value || '0') || 0;
+
+    var usdInput = document.getElementById('inv-costo-usd');
+    var copInput = document.getElementById('inv-costo-cop');
+
+    if (moneda === 'USD') {
+      /* modo USD: el usuario edita USD, COP se calcula */
+      if (usdInput) usdInput.disabled = false;
+      if (copInput) { copInput.disabled = true; copInput.value = Math.round(costoUSD * trm); }
+    } else {
+      /* modo COP: el usuario edita COP, USD se calcula */
+      if (usdInput) { usdInput.disabled = true; usdInput.value = (costoCOP / trm).toFixed(2); }
+      if (copInput) copInput.disabled = false;
+    }
+  }
+
+  function _onCostoChange() {
+    var moneda   = (document.getElementById('inv-moneda') || {}).value || 'COP';
+    var trm      = parseFloat((document.getElementById('inv-trm') || {}).value || '4000') || 4000;
+    var usdInput = document.getElementById('inv-costo-usd');
+    var copInput = document.getElementById('inv-costo-cop');
+
+    if (moneda === 'USD') {
+      var costoUSD = parseFloat((usdInput || {}).value || '0') || 0;
+      if (copInput) copInput.value = Math.round(costoUSD * trm);
+    } else {
+      var costoCOP = parseFloat((copInput || {}).value || '0') || 0;
+      if (usdInput) usdInput.value = (costoCOP / trm).toFixed(2);
+    }
+  }
+
+  function _onTRMChange() {
+    _onCostoChange();
+  }
+
+  /* ══════════════════════════════════════════
+     COLOR, FOTO
+  ══════════════════════════════════════════ */
   function _selColor(nombre, btn) {
     _colorActual = nombre;
     /* limpiar custom input */
@@ -276,7 +347,6 @@ var Inventario = (function() {
     }
   }
 
-  /* ── foto ── */
   function _onFoto(input) {
     var file = input.files && input.files[0];
     if (!file) return;
@@ -319,13 +389,18 @@ var Inventario = (function() {
     var nombre = (document.getElementById('inv-nombre') || {}).value || '';
     nombre = nombre.trim();
     var cat    = (document.getElementById('inv-cat') || {}).value || 'Otro';
-    var costo  = parseFloat((document.getElementById('inv-costo')  || {}).value  || '0') || 0;
     var precio = parseFloat((document.getElementById('inv-precio') || {}).value || '0') || 0;
     var desc   = ((document.getElementById('inv-desc') || {}).value || '').trim();
 
     /* color: swatch seleccionado o custom input */
     var colorCustom = ((document.getElementById('inv-color-custom') || {}).value || '').trim();
     var color = colorCustom || _colorActual || '';
+
+    /* moneda + TRM + costos */
+    var moneda   = (document.getElementById('inv-moneda') || {}).value || 'COP';
+    var trm      = parseFloat((document.getElementById('inv-trm') || {}).value || '4000') || 4000;
+    var costoUSD = parseFloat((document.getElementById('inv-costo-usd') || {}).value || '0') || 0;
+    var costoCOP = parseFloat((document.getElementById('inv-costo-cop') || {}).value || '0') || 0;
 
     if (!nombre) { Toast.show('El nombre es obligatorio', 'error'); return; }
 
@@ -353,14 +428,18 @@ var Inventario = (function() {
       if (idx === -1) return;
       data.inventario[idx] = Object.assign({}, data.inventario[idx], {
         nombre: nombre, categoria: cat, color: color,
-        costo: costo, precio: precio, descripcion: desc,
+        precio: precio, descripcion: desc,
+        moneda: moneda, trm: trm, costoUSD: costoUSD, costoCOP: costoCOP,
+        costo: costoCOP, /* compatibilidad con código existente */
         tallas: tallasObj, foto: foto, actualizadoEn: ahora
       });
     } else {
       data.inventario = data.inventario || [];
       data.inventario.push({
         id: _uid(), nombre: nombre, categoria: cat, color: color,
-        costo: costo, precio: precio, descripcion: desc,
+        precio: precio, descripcion: desc,
+        moneda: moneda, trm: trm, costoUSD: costoUSD, costoCOP: costoCOP,
+        costo: costoCOP, /* compatibilidad */
         tallas: tallasObj, foto: foto,
         creadoEn: ahora, actualizadoEn: ahora
       });
@@ -474,7 +553,10 @@ var Inventario = (function() {
     _onFoto: _onFoto,
     _quitarFoto: _quitarFoto,
     _selColor: _selColor,
-    _onColorCustom: _onColorCustom
+    _onColorCustom: _onColorCustom,
+    _onMonedaChange: _onMonedaChange,
+    _onCostoChange: _onCostoChange,
+    _onTRMChange: _onTRMChange
   };
 
 }());

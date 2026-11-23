@@ -1095,3 +1095,74 @@ textarea { resize: vertical; min-height: 80px; }
   color: var(--text-secondary);
   font-weight: 600;
 }
+
+/* ══════════════════════════════════════════════
+   SAFARI iOS OPTIMIZATIONS
+══════════════════════════════════════════════ */
+
+/* Prevenir zoom al enfocar inputs */
+input[type="text"],
+input[type="password"],
+input[type="number"],
+input[type="search"],
+input[type="email"],
+input[type="date"],
+select,
+textarea {
+  font-size: 16px !important; /* 16px mínimo para prevenir zoom en Safari */
+}
+
+/* Touch targets mínimo 44x44px (Apple HIG) */
+button,
+.btn,
+.color-swatch,
+.talla-chip,
+.nav-item {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* Optimizar scroll suave en iOS */
+.main-content,
+.inventario-lista,
+.ventas-lista,
+.modal-content {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Prevenir double-tap zoom en botones */
+button,
+.btn,
+a {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Safe area para iPhone con notch */
+@supports (padding: max(0px)) {
+  body {
+    padding-left: max(0px, env(safe-area-inset-left));
+    padding-right: max(0px, env(safe-area-inset-right));
+    padding-bottom: max(0px, env(safe-area-inset-bottom));
+  }
+  
+  .topbar {
+    padding-left: max(16px, calc(16px + env(safe-area-inset-left)));
+    padding-right: max(16px, calc(16px + env(safe-area-inset-right)));
+  }
+  
+  .nav-bar {
+    padding-left: max(0px, env(safe-area-inset-left));
+    padding-right: max(0px, env(safe-area-inset-right));
+    padding-bottom: max(16px, calc(16px + env(safe-area-inset-bottom)));
+  }
+}
+
+/* Mejorar renderizado en Safari */
+.inv-card,
+.venta-card,
+.kpi-card,
+.modal-content {
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+}
