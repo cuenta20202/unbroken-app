@@ -5,7 +5,7 @@
 
 /* Cambia este número cada vez que subas cambios a GitHub.
    El navegador detecta que sw.js cambió y actualiza todo. */
-const VERSION = '20261122-1';
+const VERSION = '20261122-2';
 const CACHE   = 'unbroken-' + VERSION;
 
 self.addEventListener('install', function(e) {

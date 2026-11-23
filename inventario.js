@@ -200,7 +200,7 @@ var Inventario = (function() {
           }).join('') +
         '</select></div>' +
         '<div class="form-group"><label>Precio de venta ($)</label>' +
-          '<input type="number" id="inv-precio" value="' + (item ? item.precio || '' : '') + '" placeholder="0" min="0" /></div>' +
+          '<input type="text" inputmode="decimal" id="inv-precio" value="' + (item ? item.precio || '' : '') + '" placeholder="0" /></div>' +
       '</div>' +
 
       /* — MONEDA + TRM — */
@@ -213,13 +213,13 @@ var Inventario = (function() {
               '<option value="USD"' + (moneda === 'USD' ? ' selected' : '') + '>Dólares USD</option>' +
             '</select></div>' +
           '<div class="form-group"><label style="font-size:12px;font-weight:600;margin-bottom:4px">TRM (USD → COP)</label>' +
-            '<input type="number" id="inv-trm" value="' + trm + '" placeholder="4000" min="0" step="1" onchange="Inventario._onTRMChange()" /></div>' +
+            '<input type="text" inputmode="decimal" id="inv-trm" value="' + trm + '" placeholder="4000" onchange="Inventario._onTRMChange()" /></div>' +
         '</div>' +
         '<div class="form-row">' +
           '<div class="form-group"><label style="font-size:12px;font-weight:600;margin-bottom:4px">Costo USD</label>' +
-            '<input type="number" id="inv-costo-usd" value="' + costoUSD + '" placeholder="0" min="0" step="0.01" onchange="Inventario._onCostoChange()" /></div>' +
+            '<input type="text" inputmode="decimal" id="inv-costo-usd" value="' + costoUSD + '" placeholder="0" onchange="Inventario._onCostoChange()" /></div>' +
           '<div class="form-group"><label style="font-size:12px;font-weight:600;margin-bottom:4px">Costo COP</label>' +
-            '<input type="number" id="inv-costo-cop" value="' + costoCOP + '" placeholder="0" min="0" step="1" onchange="Inventario._onCostoChange()" /></div>' +
+            '<input type="text" inputmode="decimal" id="inv-costo-cop" value="' + costoCOP + '" placeholder="0" onchange="Inventario._onCostoChange()" /></div>' +
         '</div>' +
         '<div style="font-size:11px;color:var(--text-muted);margin-top:4px">💡 Elige la moneda de compra y el sistema convierte automáticamente</div>' +
       '</div>' +
@@ -269,19 +269,17 @@ var Inventario = (function() {
   ══════════════════════════════════════════ */
   function _onMonedaChange() {
     var moneda   = (document.getElementById('inv-moneda') || {}).value || 'COP';
-    var trm      = parseFloat((document.getElementById('inv-trm') || {}).value || '4000') || 4000;
-    var costoUSD = parseFloat((document.getElementById('inv-costo-usd') || {}).value || '0') || 0;
-    var costoCOP = parseFloat((document.getElementById('inv-costo-cop') || {}).value || '0') || 0;
+    var trm      = _num((document.getElementById('inv-trm') || {}).value) || 4000;
+    var costoUSD = _num((document.getElementById('inv-costo-usd') || {}).value);
+    var costoCOP = _num((document.getElementById('inv-costo-cop') || {}).value);
 
     var usdInput = document.getElementById('inv-costo-usd');
     var copInput = document.getElementById('inv-costo-cop');
 
     if (moneda === 'USD') {
-      /* modo USD: el usuario edita USD, COP se calcula */
       if (usdInput) usdInput.disabled = false;
       if (copInput) { copInput.disabled = true; copInput.value = Math.round(costoUSD * trm); }
     } else {
-      /* modo COP: el usuario edita COP, USD se calcula */
       if (usdInput) { usdInput.disabled = true; usdInput.value = (costoCOP / trm).toFixed(2); }
       if (copInput) copInput.disabled = false;
     }
@@ -289,15 +287,15 @@ var Inventario = (function() {
 
   function _onCostoChange() {
     var moneda   = (document.getElementById('inv-moneda') || {}).value || 'COP';
-    var trm      = parseFloat((document.getElementById('inv-trm') || {}).value || '4000') || 4000;
+    var trm      = _num((document.getElementById('inv-trm') || {}).value) || 4000;
     var usdInput = document.getElementById('inv-costo-usd');
     var copInput = document.getElementById('inv-costo-cop');
 
     if (moneda === 'USD') {
-      var costoUSD = parseFloat((usdInput || {}).value || '0') || 0;
+      var costoUSD = _num((usdInput || {}).value);
       if (copInput) copInput.value = Math.round(costoUSD * trm);
     } else {
-      var costoCOP = parseFloat((copInput || {}).value || '0') || 0;
+      var costoCOP = _num((copInput || {}).value);
       if (usdInput) usdInput.value = (costoCOP / trm).toFixed(2);
     }
   }
@@ -389,7 +387,7 @@ var Inventario = (function() {
     var nombre = (document.getElementById('inv-nombre') || {}).value || '';
     nombre = nombre.trim();
     var cat    = (document.getElementById('inv-cat') || {}).value || 'Otro';
-    var precio = parseFloat((document.getElementById('inv-precio') || {}).value || '0') || 0;
+    var precio = _num((document.getElementById('inv-precio') || {}).value);
     var desc   = ((document.getElementById('inv-desc') || {}).value || '').trim();
 
     /* color: swatch seleccionado o custom input */
@@ -398,9 +396,9 @@ var Inventario = (function() {
 
     /* moneda + TRM + costos */
     var moneda   = (document.getElementById('inv-moneda') || {}).value || 'COP';
-    var trm      = parseFloat((document.getElementById('inv-trm') || {}).value || '4000') || 4000;
-    var costoUSD = parseFloat((document.getElementById('inv-costo-usd') || {}).value || '0') || 0;
-    var costoCOP = parseFloat((document.getElementById('inv-costo-cop') || {}).value || '0') || 0;
+    var trm      = _num((document.getElementById('inv-trm') || {}).value) || 4000;
+    var costoUSD = _num((document.getElementById('inv-costo-usd') || {}).value);
+    var costoCOP = _num((document.getElementById('inv-costo-cop') || {}).value);
 
     if (!nombre) { Toast.show('El nombre es obligatorio', 'error'); return; }
 
@@ -537,6 +535,39 @@ var Inventario = (function() {
   }
   function _uid() {
     return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  }
+  /* Parsea un string numérico aceptando tanto punto como coma como separador decimal.
+     Ej: "12.500" → 12500 (miles), "12,5" → 12.5, "12.5" → 12.5 */
+  function _num(str) {
+    if (str === null || str === undefined) return 0;
+    var s = String(str).trim();
+    /* Si tiene tanto punto como coma, el último es el decimal */
+    var lastDot   = s.lastIndexOf('.');
+    var lastComma = s.lastIndexOf(',');
+    if (lastDot > -1 && lastComma > -1) {
+      /* Hay los dos: el que viene después es el decimal */
+      if (lastComma > lastDot) {
+        /* 1.234,56 → estilo europeo */
+        s = s.replace(/\./g, '').replace(',', '.');
+      } else {
+        /* 1,234.56 → estilo americano */
+        s = s.replace(/,/g, '');
+      }
+    } else if (lastComma > -1) {
+      /* Solo coma: puede ser decimal (12,5) o miles (1,000) */
+      var parteDecimal = s.slice(lastComma + 1);
+      if (parteDecimal.length <= 2) {
+        /* Pocos dígitos → es decimal */
+        s = s.replace(',', '.');
+      } else {
+        /* Muchos dígitos → es separador de miles */
+        s = s.replace(/,/g, '');
+      }
+    }
+    /* Quitar cualquier carácter que no sea dígito o punto */
+    s = s.replace(/[^0-9.]/g, '');
+    var n = parseFloat(s);
+    return isNaN(n) ? 0 : n;
   }
 
   return {
