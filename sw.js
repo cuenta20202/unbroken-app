@@ -1,29 +1,15 @@
 /* ═══════════════════════════════════════════════════
-   UNBROKEN. — sw.js  (Service Worker)
+   UNBROKEN. — sw.js
+   Network-first + auto-actualización sin borrar caché
 ═══════════════════════════════════════════════════ */
 
-const CACHE = 'unbroken-v2';
-const ASSETS = [
-  './',
-  './index.html',
-  './app.css',
-  './app.js',
-  './auth.js',
-  './data.js',
-  './inventario.js',
-  './manifest.json'
-];
+/* Cambia este número cada vez que subas cambios a GitHub.
+   El navegador detecta que sw.js cambió y actualiza todo. */
+const VERSION = '20261122-1';
+const CACHE   = 'unbroken-' + VERSION;
 
 self.addEventListener('install', function(e) {
-  e.waitUntil(
-    caches.open(CACHE).then(function(cache) {
-      return Promise.all(
-        ASSETS.map(function(url) {
-          return cache.add(url).catch(function() { /* ignorar si falla */ });
-        })
-      );
-    })
-  );
+  /* Tomar control de inmediato, sin esperar */
   self.skipWaiting();
 });
 
@@ -31,17 +17,27 @@ self.addEventListener('activate', function(e) {
   e.waitUntil(
     caches.keys().then(function(keys) {
       return Promise.all(
-        keys.filter(function(k) { return k !== CACHE; }).map(function(k) { return caches.delete(k); })
+        keys
+          .filter(function(k) { return k !== CACHE; })
+          .map(function(k) { return caches.delete(k); })
       );
+    }).then(function() {
+      /* Tomar control de todas las pestañas abiertas ahora mismo */
+      return self.clients.claim();
+    }).then(function() {
+      /* Decirle a todas las pestañas que recarguen para ver los cambios */
+      return self.clients.matchAll({ type: 'window' }).then(function(clients) {
+        clients.forEach(function(client) {
+          client.postMessage({ type: 'SW_UPDATED', version: VERSION });
+        });
+      });
     })
   );
-  self.clients.claim();
 });
 
 self.addEventListener('fetch', function(e) {
   var url = e.request.url;
 
-  /* Solo manejar http y https — ignorar chrome-extension, data:, etc. */
   if (!url.startsWith('http://') && !url.startsWith('https://')) return;
 
   /* GitHub API → siempre red, nunca cachear */
@@ -56,18 +52,17 @@ self.addEventListener('fetch', function(e) {
     return;
   }
 
-  /* Assets → cache first, luego red */
+  /* Todo lo demás → Network-first */
   e.respondWith(
-    caches.match(e.request).then(function(cached) {
-      if (cached) return cached;
-      return fetch(e.request).then(function(res) {
-        if (res && res.status === 200 && res.type === 'basic') {
-          var clone = res.clone();
-          caches.open(CACHE).then(function(c) { c.put(e.request, clone); });
-        }
-        return res;
-      }).catch(function() {
-        return new Response('', { status: 503 });
+    fetch(e.request).then(function(res) {
+      if (res && res.status === 200) {
+        var clone = res.clone();
+        caches.open(CACHE).then(function(c) { c.put(e.request, clone); });
+      }
+      return res;
+    }).catch(function() {
+      return caches.match(e.request).then(function(cached) {
+        return cached || new Response('Sin conexión', { status: 503 });
       });
     })
   );

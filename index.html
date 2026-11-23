@@ -280,5 +280,35 @@
   <script src="auth.js"></script>
   <script src="inventario.js"></script>
   <script src="app.js"></script>
+
+  <script>
+    /* Service Worker — registro + auto-recarga cuando hay versión nueva */
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('./sw.js').then(function(reg) {
+
+        /* Escuchar mensajes del SW nuevo */
+        navigator.serviceWorker.addEventListener('message', function(event) {
+          if (event.data && event.data.type === 'SW_UPDATED') {
+            /* Recargar silenciosamente para aplicar la versión nueva */
+            window.location.reload();
+          }
+        });
+
+        /* También detectar cuando el SW nuevo toma el control */
+        reg.addEventListener('updatefound', function() {
+          var nuevo = reg.installing;
+          if (!nuevo) return;
+          nuevo.addEventListener('statechange', function() {
+            if (nuevo.state === 'activated') {
+              window.location.reload();
+            }
+          });
+        });
+
+      }).catch(function(err) {
+        console.warn('SW registro falló:', err);
+      });
+    }
+  </script>
 </body>
 </html>
